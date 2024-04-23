@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+   <head>
+      <title>Lab Test 1</title>
+      <!-- CSS only -->
+      <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3" crossorigin="anonymous">
+   </head>
+
+   <body>
+     <main class='container'>
+       <h1>Chat</h1>
+       <div>
+        <a class='btn btn-danger' href='/logout'>Logout</a>
+        <button class='btn btn-danger d-none' onclick="leaveRoom()" id='leaveRoomButton'>Leave</button>
+       </div>
+       <div id='error-container'></div>
+       <br/>
+       <label for="rooms">Choose a room:</label>
+       <select name="rooms" id="rooms" class=''>
+           <option value='GBC'>GBC</option>
+           <option value='Hockey'>Hockey</option>
+           <option value='Videogames'>Video games</option>
+       </select>
+       <button onclick='joinRoom()' class='btn btn-success'>Join Room</button>
+       <h1 id='roomName'></h1>
+       <br/>
+       <div id='sendmessage-container' class='d-none'>
+        <input id='roomMessage' type='text' name='roomMessage' value="" placeholder="Enter message to room" oninput="typing()">
+        <button class='btn btn-primary' onClick='sendMessage()'>Send message</button>
+        <div id = "message-container"></div>
+       </div>
+       <div id='user-typing'></div>
+      </main>
+   </body>
+
+   <script src="/socket.io/socket.io.js"></script>
+   <script>
+       // handle cookies
+       username = getCookie('username')
+       if(username==''){
+           console.log('user not logged in')
+           window.location.replace("http://localhost:3000/login")
+       }
+
+       const client = io()
+       
+
+       // sockit.io
+       // welcome message
+       client.on('welcome', (message) => {
+            addMessage(message)
+       })
+
+       // message from other clients
+       client.on('newMessage', (message) => {
+        addMessage(message)
+       })
+
+       // onclick functions
+       // send message, to room
+       function sendMessage() {
+        message = document.getElementById('roomMessage').value
+        var roomName = document.getElementById('roomName').innerHTML
+
+        // if message isn't empty
+        if(message != ''){
+          messageSend = {
+            room: roomName,
+            message: message,
+            username: username
+          }
+          console.log(roomName)
+          client.emit('messageRoom', messageSend)
+          addMessage(messageSend)
+          message.value=''
+        }
+       }
+
+       // add message to display
+       function addMessage(message){
+        document.getElementById('message-container').innerHTML += `<div> ${message.username}: ${message.message} </div>`
+      }
+
+       function joinRoom() {
+           let roomNameH1 = document.getElementById('roomName')
+           let roomNameTag = document.getElementById('rooms')
+           let sendMessageContainer = document.getElementById('sendmessage-container')
+           let messageContainer = document.getElementById('message-container')
+           let leaveRoomButton = document.getElementById('leaveRoomButton')
+           let roomName = roomNameTag.options[roomNameTag.selectedIndex].value
+
+           roomNameH1.innerHTML = roomName
+           sendMessageContainer.classList.remove('d-none')
+           leaveRoomButton.classList.remove('d-none')
+           messageContainer.innerHTML = ''
+           newRoomMessage = {
+             message: `Joined new group - ${roomName}`,
+             username: 'Server'
+           }
+           addMessage(newRoomMessage)
+
+           client.emit('join', roomName)
+       }
+
+       function leaveRoom() {
+        let roomNameH1 = document.getElementById('roomName')
+        let sendMessageContainer = document.getElementById('sendmessage-container')
+        let leaveRoomButton = document.getElementById('leaveRoomButton')
+
+        // clear roomname and messaging
+        roomNameH1.innerHTML = ''
+        sendMessageContainer.classList.add('d-none')
+        leaveRoomButton.classList.add('d-none')
+        document.getElementById('message-container').innerHTML= ''
+        
+        // send disconnect 
+        client.emit('join', 'default')
+       }
+
+       // get cookie values
+       function getCookie(cname) {
+        let name = cname + "=";
+        let decodedCookie = decodeURIComponent(document.cookie);
+        let ca = decodedCookie.split(';');
+        for(let i = 0; i <ca.length; i++) {
+          let c = ca[i];
+          while (c.charAt(0) == ' ') {
+            c = c.substring(1);
+          }
+          if (c.indexOf(name) == 0) {
+            return c.substring(name.length, c.length);
+          }
+        }
+        return "";
+      }
+
+      // user is typing
+      client.on('typing', (data) => {
+        document.getElementById('user-typing').innerHTML = `<div class='small text-muted'>${data.username} is typing</div>`
+        setTimeout(function(){
+          document.getElementById('user-typing').innerHTML = ''
+      }, 2000);
+      })
+
+      function typing() {
+        roomName = document.getElementById('roomName').innerHTML
+        data = {
+          roomName: roomName,
+          username: username
+        }
+        client.emit('typing', data)
+      }
+      
+   </script>
+</html>
